@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+		.countLines {
+		counter-reset: trCount; 
+		overflow: auto;         
+		white-space: nowrap;    
+	}                           
+		.countLines tr td:first-child:before {
+		position:relative;                
+		counter-increment: trCount;       
+		content:counter(trCount);         
+	}                              
+         table {
+            margin: 0 auto;
+        }
+        td {
+            width: 100px;
+            height: 50px;
+            border: 1px solid black;
+            text-align: center;
+            cursor: pointer;
+        }
+        .green {
+            background-color: green;
+        }
+        .red {
+            background-color: red;
+        }
+        body {
+            background-image: url('https://mipp.demakkab.go.id/storage/portal/img/png/034-airport.png');
+            background-position: top left;
+            background-size: 100px;
+            background-repeat: no-repeat;
+        }
+        #myTable {
+            position: relative;
+            padding: 90px;
+        }
+        h1 {
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 2em;
+            color: black;
+            text-align: center;
+        }
+    .day{
+            background-image: url('https://cdn-icons-png.flaticon.com/128/5367/5367718.png');
+    }
+	.night {
+			background-image: url('https://cdn-icons-png.flaticon.com/128/3901/3901848.png');
+	}
+	.day,.night {
+				vertical-align: top;
+				background-position: center 70%;
+				background-repeat:no-repeat;
+				background-size:25px;
+	}
+	#overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5); /* Dark overlay color with transparency */
+        }
+    #myElement {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+		border: 2px solid black;
+		padding: 10px;
+		z-index: 1000;
+    }
+    </style>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/smoothness/jquery-ui.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+</head>
+
+<body>
+    <script>
+    document.addEventListener("DOMContentLoaded", function () {
+    const TODAY = new Date(2023, 11, 1, 8, 0, 0, 0);
+    const DAY_BEGIN = new Date(2023, 11, 1, 6, 0, 0, 0);
+    const DAY_END = new Date(2023, 11, 1, 20, 0, 0, 0);
+
+    const dayImages = [
+        { name: 'day_sun', src: 'https://cdn-icons-png.flaticon.com/128/3682/3682916.png' },
+        { name: 'day_bad', src: 'https://cdn-icons-png.flaticon.com/128/8085/8085510.png' },
+        { name: 'day_cloud', src: 'https://cdn-icons-png.flaticon.com/128/499/499890.png' },
+    ];
+    const nightImages = [
+        { name: 'night', src: 'https://cdn-icons-png.flaticon.com/128/2929/2929548.png' },
+        { name: 'night_cloud', src: 'https://cdn-icons-png.flaticon.com/128/4448/4448401.png' },
+        { name: 'night_bad', src: 'https://cdn-icons-png.flaticon.com/128/11165/11165026.png' },
+    ];
+
+    const phrases = ["Поломка судна", "Прочая причина"];
+    const words = ["АН-2", "L-410", "АН-28", "ИЛ-76Т", "PAC 750 XSTOL", "Cessna 182", "Cessna Caravan"];
+
+    // Остальные данные
+
+    function generateAvions(count) {
+        const res = {};
+        for (let i = 1; i <= count; i++) {
+            const avion = {
+                id: "RA-00" + i,
+                type: "",
+                model: words[Math.floor(Math.random() * words.length)],
+                state: Math.round(Math.random()) ? "ok" : "broken",
+            };
+            avion.isbad = avion.state !== "ok";
+            res[avion.id] = avion;
+        }
+        return res;
+    }
+
+    const avions = generateAvions(10);
+
+    function generateWeather(date) {
+        const res = {};
+        let dt = new Date(date);
+        dt.setHours(8);
+        let de = new Date(dt);
+        de.setDate(dt.getDate() + 1);
+        for (let dti = new Date(dt); dti < de; dti.setMinutes(dti.getMinutes() + 10)) {
+            const wthr = {
+                isbad: false,
+            };
+            res[wthr.timestamp] = wthr;
+        }
+        return res;
+    }
+
+    const weather = generateWeather(TODAY);
+
+    // Остальные данные
+
+    function createTable() {
+        const table = document.createElement('table');
+        table.id = 'myTable';
+        document.body.appendChild(table);
+        return table;
+    }
+
+    function createCell(row, content, className = '') {
+        const cell = row.insertCell();
+        cell.innerHTML = content;
+        cell.className = className;
+        return cell;
+    }
+
+    function createHeaderRow(table) {
+        const headerRow = table.insertRow();
+        createCell(headerRow, 'ID');
+        createCell(headerRow, 'Model');
+        return headerRow;
+    }
+
+    function updateHeaderRow(table) {
+    const headerRow = table.rows[0];
+    let weatherConditionFound = false;
+
+    for (let i = 0; i < headerRow.cells.length; i++) {
+        const cell = headerRow.cells[i];
+        if (cell.innerHTML.includes('day_bad') || cell.innerHTML.includes('night_bad')) {
+            cell.style.backgroundColor = 'red';
+            cell.innerHTML = 'Погодные условия';
+            weatherConditionFound = true;
+        } else if (weatherConditionFound) {
+            // If weather condition was found in the previous cell, update subsequent cells
+            cell.style.backgroundColor = 'red';
+            cell.innerHTML = 'Погодные условия';
+        } else {
+            // Check if the current cell is green and change it to red
+            if (cell.classList.contains('green')) {
+                cell.style.backgroundColor = 'red';
+                cell.innerHTML = 'Погодные условия';
+            }
+        }
+    }
+}
+
+
+    function fillTableWithData(table, orders, avions) {
+                for (let i = 0; i < orders.length; i++) {
+                    const order = orders[i];
+                    const avion = avions[order.airplan];
+                    const row = table.insertRow();
+                    createCell(row, avion.id);
+                    createCell(row, avion.model);
+                }
+                updateFirstRow(table);// Добавьте этот вызов после заполнения таблицы данными, обновляем первую строку
+    }
+
+    function checkGreenCells() {
+        const table = document.getElementById('myTable');
+        let greenCount = 0;
+
+        for (let i = 0; i < table.rows.length; i++) {
+            const cells = table.rows[i].cells;
+            for (let j = 0; j < cells.length; j++) {
+                if (cells[j].className === 'green') {
+                    greenCount++;
+                    if (greenCount >= 2) {
+                        return true;
+                    }
+                } else {
+                    greenCount = 0;
+                }
+            }
+        }
+        return false;
+    }
+
+    function mergeCells() {
+        const table = document.getElementById('myTable');
+        let greenCount = 0;
+        let greenCell;
+
+        for (let i = 0; i < table.rows.length; i++) {
+            const cells = table.rows[i].cells;
+            for (let j = 0; j < cells.length; j++) {
+                if (cells[j].className === 'green') {
+                    greenCount++;
+                    if (greenCount === 1) {
+                        greenCell = cells[j];
+                    } else if (greenCount === 2) {
+                        greenCell.colSpan = 2;
+                        const groupNumber = Math.floor(Math.random() * 1100);
+                        greenCell.innerHTML = 'Группа ' + groupNumber;
+                        cells[j].remove();
+                        greenCount = 0;
+                    }
+                } else {
+                    greenCount = 0;
+                }
+            }
+        }
+    }
+
+	// Функция для обновления первой строки таблицы
+            function updateFirstRow(table) {
+                const firstRow = table.rows[0];
+                let weatherConditionFound = false;
+
+                for (let i = 0; i < firstRow.cells.length; i++) {
+                    const cell = firstRow.cells[i];
+                    if (cell.innerHTML.includes('day_bad') || cell.innerHTML.includes('night_bad')) {
+                        // Если найдена картинка "day_bad" или "night_bad", обновляем столбец
+                        cell.style.backgroundColor = 'red';
+                        cell.innerHTML = 'Погодные условия';
+                        weatherConditionFound = true;
+                    } else if (weatherConditionFound) {
+                        // Если погодные условия были найдены в предыдущей ячейке, обновляем следующие ячейки
+                        cell.style.backgroundColor = 'red';
+                        cell.innerHTML = 'Погодные условия';
+                    } else {
+                        // Проверяем, если текущая ячейка зеленая, меняем ее на красную
+                        if (cell.classList.contains('green')) {
+                            cell.style.backgroundColor = 'red';
+                            cell.innerHTML = 'Погодные условия';
+                        }
+                    }
+                }
+            }
+
+   function generateTimeBlocks(table, timeStart, timeEnd, timeBlockMinutes) {
+    let time = new Date(timeStart);
+
+    for (let i = 0; i < words.length + 1; i++) {
+        const row = table.insertRow(i);
+        time = new Date(timeStart); // обновляем время для каждой строки
+        time.setMinutes(0); // устанавливаем минуты в 0
+        for (let j = 0; time <= timeEnd; j++, time.setMinutes(time.getMinutes() + timeBlockMinutes)) {
+            const cell = row.insertCell(j);
+
+            if (j === 0) {
+                cell.style.backgroundColor = 'white';
+            }
+
+            if (i === 0 && j === 0) {
+                cell.innerHTML = 'Судно';
+            }
+
+            if (i === 0 && j > 0) {
+                cell.innerHTML = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const currentHour = time.getHours();
+                if ((currentHour >= 20 && currentHour <= 23) || (currentHour >= 0 && currentHour < 6)) {
+                    cell.style.backgroundColor = 'black';
+                    cell.style.color = 'white'; // Новая строка для изменения цвета текста на белый
+                    const randomNightImageIndex = Math.floor(Math.random() * nightImages.length);
+                    const imgSrc = nightImages[randomNightImageIndex].src;
+                    const img = createImageElement(imgSrc);
+                    cell.appendChild(img);
+                } else {
+                    cell.style.backgroundColor = 'white';
+                    cell.style.color = 'black'; // Новая строка для изменения цвета текста на черный
+                    const randomDayImageIndex = Math.floor(Math.random() * dayImages.length);
+                    const imgSrc = dayImages[randomDayImageIndex].src;
+                    const img = createImageElement(imgSrc);
+                    cell.appendChild(img);
+                }
+            } else {
+                 if (j > 0) {
+                    cell.innerHTML = 'Запись свободна';
+                    if (Math.random() > 0.5) {
+                        cell.classList.add('red');
+                    } else {
+                        cell.classList.add('green');
+                    }
+					/*const avionId = 'RA-00' + i; // Предполагая, что id генерируется таким образом
+                    const avion = avions[avionId];
+                    const weatherTimestamp = time.getTime(); // Используем timestamp в качестве ключа для объекта weather
+
+                    // Объект для хранения данных ячейки
+                    const cellData = {
+                        status: avion.state,
+                        isBad: avion.isbad,
+                        weatherCondition: weather[weatherTimestamp].isbad,
+                        avionId: avion.id,
+                    };
+					
+                    // Пример использования данных объекта в ячейке
+                    cell.innerHTML = `${cellData.status}, ${cellData.weatherCondition ? 'Bad Weather' : 'Good Weather'}`;
+                    */
+					if (cell.classList.contains('red')) {
+                        const randomIndex = Math.floor(Math.random() * phrases.length);
+                        cell.innerHTML = phrases[randomIndex];
+                    } else if (cell.classList.contains('green')) {
+                        const randomIndex = Math.floor(Math.random() * uniqueNumbers.length);
+                        const randomNumber = uniqueNumbers[randomIndex];
+                        cell.innerHTML = 'Группа ' + randomNumber;
+                        uniqueNumbers.splice(randomIndex, 1);
+                    }
+                }
+
+                if (i > 0 && j === 0) {
+                    cell.innerHTML = words[i - 1];
+                }
+			}
+			}
+		}
+	}
+
+
+
+    function createImageElement(src) {
+        const img = document.createElement('img');
+        img.src = src;
+        img.style.width = '30px';
+        img.style.height = '30px';
+        img.style.bottom = '0';
+        return img;
+    }
+
+    function createDialogHtml(groupNumber, shipName, result, today) {
+		const tableHtml = '<table><tr><th>№</th><th>ФИО</th><th>Время</th><th>Стоимость</th></tr><tbody>';
+		for (let i = 0; i < 7; i++) {
+			tableHtml += '<tr><td>' + (i + 1) + '</td><td>Фамилия И.О.</td><td>' + result + '</td><td>1000</td></tr>';
+		}
+		tableHtml += '</tbody></table>';
+
+		const dialogHtml = '<div id="myElement">' +
+			'<h2>Группа ' + groupNumber + '</h2>' +
+			'<p>Тип ВС: ' + shipName + '</p>' +
+			'<p>Аэродром: ' + '</p>' +
+			'<p>Дата: ' + today + '</p>' +
+			'<p>Выпускающий: ' + '</p>' +
+			tableHtml +
+			'</div>';
+
+		$('body').append(dialogHtml);
+	}
+
+	
+	function showOverlay() {
+        $("#overlay").fadeIn();
+    }
+
+    function hideOverlay() {
+        $("#overlay").fadeOut();
+    }
+
+    // Инициализация таблицы
+    const table = createTable();
+    const timeStart = new Date(TODAY);
+    const timeEnd = new Date(TODAY);
+    timeEnd.setDate(TODAY.getDate() + 1);
+    const timeBlockMinutes = 10;
+
+    // Массив с уникальными номерами
+    const uniqueNumbers = Array.from({ length: 1100 }, (_, i) => i + 1);
+	function getTimeInfo(cellIndex) {
+		var times = ''; // Создаем переменную для хранения времени
+
+		var selectedCell = $('tr:first-child td:nth-child(' + (cellIndex + 1) + ')');
+
+		// Проверяем, является ли выбранная ячейка зеленой и объединенной
+		if (selectedCell.hasClass('green') && selectedCell.attr('colspan') > 1) {
+			// Если ячейка зеленая и объединенная, узнаем время из ячеек, которые находятся над ней в первой строке
+			selectedCell.prevUntil('td[colspan="1"]').andSelf().each(function () {
+				times += $(this).text() + '-'; // Добавляем текст из текущей ячейки с символом '-' в конец строки времени
+			});
+
+		} else {
+			// Если ячейка не является зеленой и объединенной, или не объединена вообще, просто получаем время из выбранной ячейки
+			times = selectedCell.text();
+		}
+
+		return times; // Возвращаем строку времени
+	}
+
+
+    // Генерация таблицы
+    generateTimeBlocks(table, timeStart, timeEnd, timeBlockMinutes);
+    mergeCells();
+    // После генерации таблицы, обновляем первую строку
+    updateFirstRow(table);
+    // Обработчик нажатия на зеленую ячейку
+    $(document).on('click', '.green', function (event) {
+		showOverlay();
+		var groupNumber = $(event.target).text().split(' ')[1];
+		var shipName = $(event.target).closest('tr').find('td:first').text();
+		var cellIndex = $(event.target).closest('td').index();
+		var today = new Date();
+		var dd = String(today.getDate()).padStart(2, '0');
+		var mm = String(today.getMonth() + 1).padStart(2, '0');
+		var yyyy = today.getFullYear();
+		today = dd + '.' + mm + '.' + yyyy;
+		var times = getTimeInfo(cellIndex);
+        var type = 'Тип ВС:  ';
+        var airport = 'Аэродром:';
+        var date = 'Дата:   ';
+        var producer = 'Выпускающий:';
+        var tableHtml = '<table class="tcont countLines"><thead><th>№</th><th>ФИО</th><th>Время</th><th>Стоимость</th></thead><tbody>';
+		for (var i = 0; i < 7; i++) {
+			tableHtml += '<tr><td>' + '</td><td>Фамилия И.О.</td><td>' + times + '</td><td>1000</td></tr>';
+		}
+		console.log(shipName);
+        tableHtml += '</tbody></table>';
+        var dialogHtml = '<div id="myElement">' +
+            '<h2>Группа ' + groupNumber + '</h2>' +
+            '<p>' + type + shipName + '</p>' +
+            '<p>' + airport + '</p>' +
+            '<p>' + date + today + '</p>' +
+            '<p>' + producer + '</p>' +
+            tableHtml +
+            '</div>';
+        $('body').append(dialogHtml);
+        // Отображаем диалоговое окно
+        $("#myElement").fadeIn();
+		$(document).mouseup(function (e) {
+                    var container = $("#myElement");
+                    if (!container.is(e.target) && container.has(e.target).length === 0) {
+                        container.fadeOut();
+                        container.remove();
+                    }
+                });
+		$(function() {
+            $("#myElement").dialogHtml({
+                modal: true,
+                closeOnEscape: false,
+                draggable: false,
+                resizable: false,
+                open: function(event, ui) {
+                    $(".ui-dialog-titlebar-close").hide(); // Скрываем кнопку "Закрыть"
+                },
+                mouseleave: function(event) {
+                    $(this).dialog("close"); // Закрываем окно при наведении курсора за пределы окна
+                }
+            });
+        });
+		$("#myElement tbody").sortable({
+			items: "tr",
+			cursor: "pointer",
+			axis: "y",
+			dropOnEmpty: false,
+			start: function (e, ui) {
+				console.log('Sorting started');
+				ui.item.addClass("selected");
+			},
+			stop: function (e, ui) {
+				console.log('Sorting started');
+				ui.item.removeClass("selected");
+			},
+			update: function (e, ui) {
+				console.log('Sorting started');
+				const draggedRow = ui.item;
+				const droppedOnRow = $(this).children().eq(ui.position.top);
+				draggedRow.insertBefore(droppedOnRow);
+			},
+		});
+	});
+});
+    </script>
+</body>
+</html>
+
